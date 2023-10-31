@@ -1,0 +1,538 @@
+---
+title: "Global births analysis, October 6th 2023"
+output: 
+  html_document:
+    css: Wil_style.css
+    theme: default
+    toc: TRUE
+    toc_float: TRUE
+    number_sections: TRUE
+always_allow_html: yes
+---
+
+```{r setup_1, include=FALSE}
+
+knitr::opts_chunk$set(echo = TRUE)
+library(dplyr)
+library(gglaplot)
+library(ggplot2)
+library(data.table)
+library(lubridate)
+library(tidyr)
+library(png)
+library(stringr)
+library(tidyverse)
+library(plotly)
+library(sf)
+library(scales)
+library(htmlwidgets)
+library(ggplot2)
+library(gglaplot)
+library(ggrepel)
+
+
+#devtools::load_all("C:/demogtools/")
+
+data_dir <- 'C:/Families/Data/'
+chart_dir <- 'C:/Families/Charts/'
+
+
+```
+
+# Data from "Our World in Data"
+
+Said to be from UN originally
+
+Source of data: [Click here](https://ourworldindata.org/fertility-rate) 
+
+```{r setup_2, include=FALSE}
+#--------------------------------------------------------------------------------
+
+# DATA FROM "OUR WORLD IN DATA"
+# Said to be from UN originally
+
+Input_Global_Births <- read.csv("C:/Families/Births/Global_Births_Data.csv")  %>%
+ data.frame()
+
+Global_Births_long <- Input_Global_Births %>% pivot_longer(c("X1950","X2021"), names_to="Year", values_to="Birth_rate") %>%
+    mutate(NewYear = substr(Year, 2, nchar(Year))) %>%
+  data.frame()
+
+Input_Global_Fert <- read.csv("C:/Families/Births/Global_Fert_Data.csv")  %>%
+ data.frame()
+
+Global_Fert_long <- Input_Global_Fert %>% pivot_longer(c("X1950","X2021"), names_to="Year", values_to="Fert_rate") %>%
+    mutate(NewYear = substr(Year, 2, nchar(Year))) %>%
+  data.frame()
+
+
+
+```
+
+
+```{r fig_Global_Births, fig.height = 5.56, fig.width = 9,  echo=FALSE, warning=FALSE, message=FALSE}
+
+
+Births_countries_bar <- Global_Births_long %>%
+  ggplot(aes(fill = NewYear, y=Birth_rate, x=reorder(Country, -Order), text = paste("Year: ", NewYear,
+                          "<br>Country: ", Country,
+                          "<br>Births per 1000 population: ", round(Birth_rate, digits = 1)) 
+  )) + 
+  theme_gla() +
+  theme(axis.text.x=element_text(color = "black", 
+                               size=11, family = "Arial", angle=30, vjust=.8, hjust=0.8)) +
+  geom_bar(position='dodge', stat='identity') 
+#Births_countries_bar
+
+# ggsave (filename = (paste0(chart_dir, "Births_countries_OWID_bar.png")),
+#          plot = Births_countries_bar,
+#          device = "png",
+#          dpi=600,
+#          width = 9,
+#          height = 5.56,
+#          units = "in")
+
+Births_countries_bar_int <- ggplotly(Births_countries_bar, tooltip = "text") %>%
+  style(hoverlabel = list(bgcolor = "white")) %>%
+  layout(legend=list(title=list(text='Year',
+                                font = list(family = "Arial", size = 16)),
+                     font = list(family = "Arial", size = 14))) %>%
+  layout(title= list(x = 0.05,
+                     text = "<b>Birth rates (per 1000 population)<b>",
+                     font=list(size = 20, family = "Arial")))
+Births_countries_bar_int 
+
+```
+<div style = "font-family: arial; font-size: 90%; padding: 15px">
+
+Source: "Our World in Data", Chart: GLA demography
+
+</div>
+
+
+The chart above is ordered by current values. Interesting that if had ordered by values in 1950, the UK would have had the lowest value. It's moving up the ranking because the birth rate hasn't changed as much as e.g. Japan, Italy, Spain.
+
+It's better to use TFR than birth rate as this takes into account age structure of populations. See below. The comments above still apply.
+
+Interesting that China has a lower TFR than everywhere else!
+
+
+```{r fig_Global_Fert, fig.height = 5.56, fig.width = 9,  echo=FALSE, warning=FALSE, message=FALSE}
+
+TFR_Countries_1950_bar <- Global_Fert_long %>%
+  ggplot(aes(fill = NewYear, y=Fert_rate, x=reorder(Country, -Order), text = paste("Year: ", NewYear,
+                          "<br>Country: ", Country,
+                          "<br>Fertility rate: ", round(Fert_rate, digits = 2)) 
+  )) + 
+  theme_gla() +
+  theme(axis.text.x=element_text(color = "black", 
+                               size=11, family = "Arial", angle=30, vjust=.8, hjust=0.8)) +
+  geom_bar(position='dodge', stat='identity') 
+#TFR_Countries_1950_bar
+
+ggsave (filename = (paste0(chart_dir, "TFR_Countries_1950_bar.png")),
+         plot = TFR_Countries_1950_bar,
+         device = "png",
+         dpi=600,
+         width = 9,
+         height = 5.56,
+         units = "in")
+
+TFR_Countries_1950_bar_int <- ggplotly(TFR_Countries_1950_bar, tooltip = "text") %>%
+  style(hoverlabel = list(bgcolor = "white")) %>%
+  layout(legend=list(title=list(text='Year',
+                                font = list(family = "Arial", size = 16)),
+                     font = list(family = "Arial", size = 14))) %>%
+  layout(title= list(x = 0.05,
+                     text = "<b>Fertility rate (live births per woman)<b>",
+                     font=list(size = 20, family = "Arial")))
+TFR_Countries_1950_bar_int 
+
+```
+
+<div style = "font-family: arial; font-size: 90%; padding: 15px">
+
+Source: "Our World in Data", Chart: GLA demography
+
+</div>
+
+
+# Data from UN
+
+```{r setup_3, include=FALSE}
+#--------------------------------------------------------------------------------
+
+# DATA FROM UN POPULATION PROSPECTS 2022
+# Now going back to original source, and comparing with 1990 not 1950
+
+Input_TFR <- read.csv("C:/Families/Births/UN_total_fertility_rates.csv")  %>%
+  mutate(Year = as.integer(Time)) %>%
+  mutate(Date = as.Date(paste0("31/12/",Year), format = "%d/%m/%Y")) %>%
+  mutate(TFR = as.numeric(Value)) %>%
+  data.frame()
+
+Input_SMA <- read.csv("C:/Families/Births/UN_mean_age_at_childbearing.csv")  %>%
+   mutate(Year = as.integer(Time)) %>%
+  mutate(Date = as.Date(paste0("31/12/",Year), format = "%d/%m/%Y")) %>%
+  mutate(SMA = as.numeric(Value)) %>%
+ data.frame()
+
+Input_ASFR <- read.csv("C:/Families/Births/UN_age_specific_fertility_rates.csv")  %>%
+   mutate(Year = as.integer(Time)) %>%
+  mutate(Date = as.Date(paste0("31/12/",Year), format = "%d/%m/%Y")) %>%
+  mutate(ASFR = as.numeric(Value)) %>%
+ data.frame()
+
+
+```
+
+
+
+```{r fig_UN_TFR_line, fig.height = 5.56, fig.width = 9,  echo=FALSE, warning=FALSE, message=FALSE}
+
+
+colour_palette = c( "#9e0059","#6da7de", "#d82222", "#5ea15d", "#dee000", "#943fa6", "#63c5b5", "#ff38ba", "#eb861e", "#ee266d")
+
+TFR_Countries_line <- Input_TFR %>%
+   ggplot() +
+  geom_line(aes(x = Date, y = TFR, group = Location, color = Location,
+             text = paste("Year: ", Date,
+                          "<br>Country: ", Location,
+                          "<br>TFR: ", round(TFR, digits = 2)) 
+  )) +
+  theme_gla() +
+#  scale_x_date(date_breaks = "2 years", date_labels = "%Y") +
+ # scale_x_date(date_breaks = "1 year", labels = date_format("%b %Y")) +
+   #   scale_x_date(limits = as.Date(c("2015-01-01", "2023-09-01"), 
+      #                              date_breaks = "years",   date_labels = "%b %Y")) + 
+     scale_x_date(date_breaks = "5 years", date_labels = "%Y") +
+      scale_color_manual(name='Country:', values = colour_palette) +
+    theme(legend.title=element_text(size=14, family = "Arial"),
+        legend.text=element_text(size=11, family = "Arial"),
+        axis.text.x=element_text(color = "black", 
+                                 size=11, family = "Arial", angle = 45), # vjust=.8, hjust=0.8
+        axis.text.y=element_text(color = "black", size=11, family = "Arial")) +
+  labs(title= "TFR by country", 
+       caption = paste0("Source: UN Population Prospects 2022, Chart: GLA demography"))
+#TFR_Countries_line
+
+# ggsave (filename = (paste0(chart_dir, "TFR_Countries_line.png")),
+#          plot = TFR_Countries_line,
+#          device = "png",
+#          dpi=600,
+#          width = 9,
+#          height = 5.56,
+#          units = "in")
+
+TFR_Countries_line_int <- ggplotly(TFR_Countries_line, tooltip = "text") %>%
+  style(hoverlabel = list(bgcolor = "white")) %>%
+  layout(legend=list(title=list(text='Year',
+                                font = list(family = "Arial", size = 16)),
+                     font = list(family = "Arial", size = 14))) %>%
+  layout(title= list(x = 0.05,
+                     text = "<b>TFR by country<b>",
+                     font=list(size = 20, family = "Arial")))
+TFR_Countries_line_int
+
+```
+<div style = "font-family: arial; font-size: 90%; padding: 15px">
+
+Source: "UN Population Prospects 2022", Chart: GLA demography
+
+</div>
+
+```{r fig_UN_SMA_line, fig.height = 5.56, fig.width = 9,  echo=FALSE, warning=FALSE, message=FALSE}
+
+
+colour_palette = c( "#9e0059","#6da7de", "#d82222", "#5ea15d", "#dee000", "#943fa6", "#63c5b5", "#ff38ba", "#eb861e", "#ee266d")
+
+SMA_Countries_line <- Input_SMA %>%
+   ggplot() +
+  geom_line(aes(x = Date, y = SMA, group = Location, color = Location,
+             text = paste("Year: ", Date,
+                          "<br>Country: ", Location,
+                          "<br>SMA: ", round(SMA, digits = 1)) 
+  )) +
+  theme_gla() +
+     scale_x_date(date_breaks = "5 years", date_labels = "%Y") +
+      scale_color_manual(name='Country:', values = colour_palette) +
+    theme(legend.title=element_text(size=14, family = "Arial"),
+        legend.text=element_text(size=11, family = "Arial"),
+        axis.text.x=element_text(color = "black", 
+                                 size=11, family = "Arial", angle = 45), # vjust=.8, hjust=0.8
+        axis.text.y=element_text(color = "black", size=11, family = "Arial")) +
+  labs(title= "TFR by country", 
+       caption = paste0("Source: UN Population Prospects 2022, Chart: GLA demography"))
+#SMA_Countries_line
+
+# ggsave (filename = (paste0(chart_dir, "SMA_Countries_line.png")),
+#          plot = SMA_Countries_line,
+#          device = "png",
+#          dpi=600,
+#          width = 9,
+#          height = 5.56,
+#          units = "in")
+
+SMA_Countries_line_int <- ggplotly(SMA_Countries_line, tooltip = "text") %>%
+  style(hoverlabel = list(bgcolor = "white")) %>%
+  layout(legend=list(title=list(text='Year',
+                                font = list(family = "Arial", size = 16)),
+                     font = list(family = "Arial", size = 14))) %>%
+  layout(title= list(x = 0.05,
+                     text = "<b>SMA by country<b>",
+                     font=list(size = 20, family = "Arial")))
+SMA_Countries_line_int
+
+```
+<div style = "font-family: arial; font-size: 90%; padding: 15px">
+
+Source: "UN Population Prospects 2022", Chart: GLA demography
+
+</div>
+
+```{r setup_4, include=FALSE}
+
+# SUMMARISED DATA FROM UN POPULATION PROSPECTS 2022
+
+# Do a bar chart like I did above
+
+Input_UN_TFR <- read.csv("C:/Families/Births/UN_TFR_1990and2023.csv")  %>%
+  mutate(Year = as.factor(Time)) %>%
+  mutate(LocationNew = fct_reorder(Location, Order)) %>%
+  data.frame()
+
+```
+
+
+```{r fig_UN_TFR_bar, fig.height = 5.56, fig.width = 9,  echo=FALSE, warning=FALSE, message=FALSE}
+
+TFR_Countries_1990_bar <- Input_UN_TFR %>%
+  ggplot(aes(x=LocationNew, fill = Year, y=Value, text = paste("Year: ", Year,
+                          "<br>Country: ", Location,
+                          "<br>Fertility rate: ", round(Value, digits = 2)) 
+  )) + 
+  theme_gla() +
+   theme(axis.text.x=element_text(color = "black", 
+                                 size=11, family = "Arial", 
+                                 angle = 30, vjust=.8, hjust=0.8)) + 
+  theme(axis.text.y=element_text(color = "black", size=11, family = "Arial")) +
+  geom_bar(position='dodge', stat='identity') +
+   labs(title= "Total Fertility Rate (live births per woman)",
+      subtitle= "by country, 1990 and 2023",   
+     caption = paste0("Source: UN Population Prospects 2022, Chart: GLA demography"))
+TFR_Countries_1990_bar 
+
+ggsave (filename = (paste0(chart_dir, "TFR_Countries_UN_1990_bar.png")),
+         plot = TFR_Countries_1990_bar,
+         device = "png",
+         dpi=600,
+         width = 9,
+         height = 5.56,
+         units = "in")
+
+TFR_Countries_1990_bar_int <- ggplotly(TFR_Countries_1990_bar, tooltip = "text") %>%
+  style(hoverlabel = list(bgcolor = "white")) %>%
+  layout(legend=list(title=list(text='Year',
+                                font = list(family = "Arial", size = 16)),
+                     font = list(family = "Arial", size = 14))) %>%
+  layout(title= list(x = 0.05,
+                     text = "<b>Total Fertility Rate (live births per woman) by country, 1990 & 2023<b>",
+                     font=list(size = 20, family = "Arial")))
+TFR_Countries_1990_bar_int
+
+```
+
+<div style = "font-family: arial; font-size: 90%; padding: 15px">
+
+Source: "UN Population Prospects 2022", Chart: GLA demography
+
+</div>
+
+Interesting that France, Italy and Spain haven't changed since 1990.
+
+```{r setup_5, include=FALSE}
+
+# SUMMARISED DATA FROM UN POPULATION PROSPECTS 2022
+
+# A bar chart like the earlier one but for SMA
+
+Input_UN_SMA_Select <- read.csv("C:/Families/Births/UN_SMA_1990and2023.csv")  %>%
+  mutate(Year = as.factor(Time)) %>%
+  mutate(LocationNew = fct_reorder(Location, Order)) %>%
+  data.frame()
+
+```
+
+
+```{r fig_UN_SMA_bar, fig.height = 5.56, fig.width = 9,  echo=FALSE, warning=FALSE, message=FALSE}
+
+#glimpse(Input_UN_SMA_Select)
+
+SMA_Countries_bar <- Input_UN_SMA_Select %>%
+  ggplot(aes(x=LocationNew, fill = Year, y=Value, text = paste("Year: ", Year,
+                          "<br>Country: ", Location,
+                          "<br>SMA: ", round(Value, digits = 2)) 
+  )) + 
+  theme_gla() +
+  theme(axis.text.x=element_text(color = "black", 
+                                 size=11, family = "Arial", 
+                                 angle = 30, vjust=.8, hjust=0.8)) + 
+  theme(axis.text.y=element_text(color = "black", size=11, family = "Arial")) +
+  geom_bar(position='dodge', stat='identity') +
+#  ylim(20, 35) +
+  #scale_y_continuous(limits = c(20, 35)) +
+ labs(title= "Change in SMA between 1990 and 2023 (UN data)", 
+     caption = paste0("Source: UN Population Prospects 2022, Chart: GLA demography"))
+#SMA_Countries_bar
+
+ggsave (filename = (paste0(chart_dir, "SMA_Countries_UN_bar.png")),
+         plot = SMA_Countries_bar,
+         device = "png",
+         dpi=600,
+         width = 9,
+         height = 5.56,
+         units = "in")
+
+SMA_Countries_bar_int <- ggplotly(SMA_Countries_bar, tooltip = "text") %>%
+  style(hoverlabel = list(bgcolor = "white")) %>%
+  layout(legend=list(title=list(text='Year',
+                                font = list(family = "Arial", size = 16)),
+                     font = list(family = "Arial", size = 14))) %>%
+  layout(title= list(x = 0.05,
+                     text = "<b>Change in SMA between 1990 and 2023 (UN data)<b>",
+                     font=list(size = 20, family = "Arial")))
+SMA_Countries_bar_int
+
+```
+<div style = "font-family: arial; font-size: 90%; padding: 15px">
+
+Source: "UN Population Prospects 2022", Chart: GLA demography
+
+</div>
+
+All have increased.
+
+```{r setup_6, include=FALSE}
+
+# DATA FROM EUROSTAT
+
+Input_Eurostat_TFR <- read.csv("C:/Families/Births/Eurostat_TFR_Data.csv")  %>%
+ data.frame()
+
+Eurostat_TFR_long <- Input_Eurostat_TFR %>% pivot_longer(-c("REGION"), names_to="Year", values_to="Fert_rate") %>%
+    mutate(NewYear = substr(Year, 2, nchar(Year))) %>%
+    mutate(Year = as.integer(NewYear)) %>%
+    mutate(Date = as.Date(paste0("31/12/",Year), format = "%d/%m/%Y")) %>%
+    data.frame()
+
+
+```
+
+# Data from Eurostat (all Nuts 2 except for London)
+
+```{r fig_Eurostat_TFR_Line, fig.height = 5.56, fig.width = 9,  echo=FALSE, warning=FALSE, message=FALSE}
+
+
+colour_palette = c( "#9e0059","#6da7de", "#d82222", "#5ea15d", "#dee000", "#943fa6", "#63c5b5", "#ff38ba", "#eb861e", "#ee266d")
+
+TFR_Cities_line <- Eurostat_TFR_long %>%
+   ggplot() +
+  geom_line(aes(x = Date, y = Fert_rate, group = REGION, color = REGION,
+             text = paste("Year: ", Date,
+                          "<br>Country: ", REGION,
+                          "<br>TFR: ", round(Fert_rate, digits = 2)) 
+  )) +
+  theme_gla() +
+  scale_x_date(date_breaks = "2 years", date_labels = "%Y") +
+  scale_color_manual(name='Country:', values = colour_palette) +
+    theme(legend.title=element_text(size=14, family = "Arial"),
+        legend.text=element_text(size=11, family = "Arial"),
+        axis.text.x=element_text(color = "black", 
+                                 size=11, family = "Arial", angle = 45), # vjust=.8, hjust=0.8
+        axis.text.y=element_text(color = "black", size=11, family = "Arial")) +
+   labs(title= "Total Fertility Rate (live births per woman) for some European cities", 
+     caption = paste0("Source: Eurostat (ONS for London), Chart: GLA demography"))
+  
+#TFR_Cities_line
+
+ggsave (filename = (paste0(chart_dir, "TFR_Cities_Eurostat_line.png")),
+         plot = TFR_Cities_line,
+         device = "png",
+         dpi=600,
+         width = 9,
+         height = 5.56,
+         units = "in")
+
+TFR_Cities_line_int <- ggplotly(TFR_Cities_line, tooltip = "text") %>%
+  style(hoverlabel = list(bgcolor = "white")) %>%
+  layout(legend=list(title=list(text='Year',
+                                font = list(family = "Arial", size = 16)),
+                     font = list(family = "Arial", size = 14))) %>%
+  layout(title= list(x = 0.05,
+                     text = "<b>Total Fertility Rate for some European cities<b>",
+                     font=list(size = 20, family = "Arial")))
+TFR_Cities_line_int
+
+```
+
+<div style = "font-family: arial; font-size: 90%; padding: 15px">
+
+Source: Eurostat (ONS only for London), Chart: GLA demography
+
+</div>
+```{r setup_7, include=FALSE}
+
+# SUMMARISED TFR DATA FROM EUROSTAT
+
+Input_Eurostat_TFR_Select <- read.csv("C:/Families/Births/Eurostat_TFR_2010and20.csv")  %>%
+  mutate(Year = as.factor(Year)) %>%
+  mutate(Location = fct_reorder(REGION, -X)) %>%
+  data.frame()
+
+```
+
+
+```{r fig_Eurostat_TFR_Bar, fig.height = 5.56, fig.width = 9,  echo=FALSE, warning=FALSE, message=FALSE}
+
+TFR_Cities_bar <- Input_Eurostat_TFR_Select %>%
+  ggplot(aes(x=Location, fill = Year, y=Value, text = paste("Year: ", Year,
+                          "<br>Country: ", Location,
+                          "<br>Fertility rate: ", round(Value, digits = 2)) 
+  )) + 
+  theme_gla() +
+      theme(legend.title=element_text(size=14, family = "Arial"),
+        legend.text=element_text(size=11, family = "Arial"),
+        axis.text.x=element_text(color = "black", 
+                                 size=11, family = "Arial", angle = 45), # vjust=.8, hjust=0.8
+        axis.text.y=element_text(color = "black", size=11, family = "Arial")) +
+  geom_bar(position='dodge', stat='identity') +
+ labs(title= "Total Fertility Rate (live births per woman)",
+       subtitle= "for selected European Cities, 2010 and 2020",   
+       caption = paste0("Source: Eurostat and ONS, Chart: GLA demography"))
+#TFR_Cities_bar 
+
+ggsave (filename = (paste0(chart_dir, "TFR_Cities_Eurostat_bar.png")),
+         plot = TFR_Cities_bar,
+         device = "png",
+         dpi=600,
+         width = 9,
+         height = 5.56,
+         units = "in")
+
+TFR_Cities_bar_int <- ggplotly(TFR_Cities_bar, tooltip = "text") %>%
+  style(hoverlabel = list(bgcolor = "white")) %>%
+  layout(legend=list(title=list(text='Year',
+                                font = list(family = "Arial", size = 16)),
+                     font = list(family = "Arial", size = 14))) %>%
+  layout(title= list(x = 0.05,
+                     text = "<b>Total Fertility Rate (live births per woman) for selected European Cities, 2010 & 2020<b>",
+                     font=list(size = 20, family = "Arial")))
+TFR_Cities_bar_int
+
+```
+<div style = "font-family: arial; font-size: 90%; padding: 15px">
+
+Source: Eurostat (ONS only for London), Chart: GLA demography
+
+</div>
+```{r setup_7, include=FALSE}

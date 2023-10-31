@@ -1,0 +1,495 @@
+---
+title: "Births analysis, October 3rd 2023"
+output: 
+  html_document:
+    css: Wil_style.css
+    theme: default
+    toc: TRUE
+    toc_float: TRUE
+    number_sections: TRUE
+always_allow_html: yes
+---
+
+```{r setup_1, include=FALSE}
+
+knitr::opts_chunk$set(echo = TRUE)
+library(dplyr)
+library(gglaplot)
+library(ggplot2)
+library(data.table)
+library(lubridate)
+library(tidyr)
+library(png)
+library(stringr)
+library(tidyverse)
+library(plotly)
+library(sf)
+library(scales)
+library(htmlwidgets)
+library(ggplot2)
+library(gglaplot)
+library(ggrepel)
+
+
+#devtools::load_all("C:/demogtools/")
+
+data_dir <- 'C:/Families/Data/'
+chart_dir <- 'C:/Families/Charts/'
+
+
+```
+
+
+
+```{r setup_2, include=FALSE}
+#--------------------------------------------------------------------------------
+
+# DATA FROM GLA DATASTORE
+
+Births_Regions_Data <- read_csv("C:/Families/Births/actual_and_predicted_births_Regions.csv")  %>%
+#  col_types = cols(date = col_date("%d/%m/%y"
+    mutate(Date = as.Date(date, format = "%d/%m/%Y")) %>%
+ data.frame()
+
+#unique(Births_Regions_Data$gss_name)
+
+summary(Births_Regions_Data)
+
+```
+
+
+```{r fig_Region_Births_abs, fig.height = 5.56, fig.width = 9,  echo=FALSE, warning=FALSE, message=FALSE}
+
+# Time trends
+
+## Line plot of births in regions
+
+colour_palette = c( "#9e0059","#6da7de", "#d82222", "#5ea15d", "#dee000", "#943fa6", "#63c5b5", "#ff38ba", "#eb861e", "#ee266d")
+
+Births_regions_abs_line <- Births_Regions_Data %>%
+  filter(gss_name != "England") %>%
+  ggplot() +
+  geom_line(aes(x = Date, y = annual_births, group = gss_name, color = gss_name,
+             text = paste("Date: ", date,
+                          "<br>Region: ", gss_name,
+                          "<br>Births: ", round(annual_births, digits = 0)) 
+  )) +
+  theme_gla() +
+#  scale_x_date(date_breaks = "2 years", date_labels = "%Y") +
+ # scale_x_date(date_breaks = "1 year", labels = date_format("%b %Y")) +
+      scale_x_date(limits = as.Date(c("2015-01-01", "2023-09-01"), 
+                                    date_breaks = "years",   date_labels = "%b %Y")) + 
+     scale_color_manual(name='Region:', values = colour_palette) +
+    theme(legend.title=element_text(size=14, family = "Arial"),
+        legend.text=element_text(size=11, family = "Arial"),
+        axis.text.x=element_text(color = "black", 
+                                 size=11, family = "Arial", angle = 45), # vjust=.8, hjust=0.8
+        axis.text.y=element_text(color = "black", size=11, family = "Arial")) +
+  labs(title= "Births by region", 
+       caption = paste0("Source: GLA, Chart: GLA demography"))
+ 
+# ggsave (filename = (paste0(chart_dir, "Births_regions_abs_2013 to 2021_line.png")),
+#          plot = Births_regions_abs_line,
+#          device = "png",
+#          dpi=600,
+#          width = 9,
+#          height = 5.56,
+#          units = "in")
+
+Births_regions_abs_line_int <- ggplotly(Births_regions_abs_line, tooltip = "text") %>%
+  style(hoverlabel = list(bgcolor = "white")) %>%
+  layout(legend=list(title=list(text='Region',
+                                font = list(family = "Arial", size = 16)),
+                     font = list(family = "Arial", size = 20))) %>%
+  layout(title= list(x = 0.05,
+                     text = "<b>Births by region, 2015 - 2023<b>",
+                     font=list(size = 20, family = "Arial")))
+Births_regions_abs_line_int
+
+```
+
+
+
+```{r fig_Region_Births_ind, fig.height = 5.56, fig.width = 9,  echo=FALSE, warning=FALSE, message=FALSE}
+
+# Time trends
+
+## Line plot of births in regions
+
+colour_palette = c( "#9e0059","#6da7de", "#d82222", "#5ea15d", "#dee000", "#943fa6", "#63c5b5", "#ff38ba", "#eb861e", "#ee266d")
+
+Births_regions_ind_ed <- Births_Regions_Data %>%
+  filter(gss_name != "England") %>%
+#  mutate(Year_factor = as.factor(Year)) %>%
+#  mutate(Region_factor = as.factor(Region)) %>%
+  group_by(gss_name) %>% 
+  mutate(Indexed_births = (annual_births/first(annual_births))*100) %>% 
+  data.frame()
+  
+Births_regions_ind_line <- Births_regions_ind_ed %>%
+  ggplot() +
+  geom_line(aes(x = Date, y = Indexed_births, group = gss_name, color = gss_name,
+             text = paste("Year: ", date,
+                          "<br>Region: ", gss_name,
+                          "<br>Births indexed to 2013: ", round(Indexed_births, digits = 2)) 
+  )) +
+  theme_gla() +
+     scale_x_date(limits = as.Date(c("2015-01-01", "2023-09-01"), 
+                                    date_breaks = "years",   date_labels = "%b %Y")) + 
+   scale_color_manual(name='Region:', values = colour_palette) +
+    theme(legend.title=element_text(size=14, family = "Arial"),
+        legend.text=element_text(size=11, family = "Arial"),
+        axis.text.x=element_text(color = "black", 
+                                 size=11, family = "Arial", angle = 45), # vjust=.8, hjust=0.8
+        axis.text.y=element_text(color = "black", size=11, family = "Arial")) +
+  labs(title= "Indexed Births by region, 2015 - 2023", 
+       caption = paste0("Source: ONS, Chart: GLA demography"))
+
+# ggsave (filename = (paste0(chart_dir, "Births_regions_ind_2013 to 2021_line.png")),
+#          plot = Births_regions_ind_line,
+#          device = "png",
+#          dpi=600,
+#          width = 9,
+#          height = 5.56,
+#          units = "in")
+
+Births_regions_ind_line_int <- ggplotly(Births_regions_ind_line, tooltip = "text") %>%
+  style(hoverlabel = list(bgcolor = "white")) %>%
+  layout(legend=list(title=list(text='Region',
+                                font = list(family = "Arial", size = 16)),
+                     font = list(family = "Arial", size = 20))) %>%
+  layout(title= list(x = 0.05,
+                     text = "<b>Births by region, 2013 - 2021<b>",
+                     font=list(size = 15, family = "Arial")))
+Births_regions_ind_line_int
+
+```
+
+
+
+```{r setup_3, include=FALSE}
+#--------------------------------------------------------------------------------
+
+# LONDON DATA FROM GLA DATASTORE
+
+Births_London_Data <- read_csv("C:/Families/Births/actual_and_predicted_births_London.csv")  %>%
+#  col_types = cols(date = col_date("%d/%m/%y"
+    mutate(Date = as.Date(date, format = "%d/%m/%Y")) %>%
+ data.frame()
+
+Births_London_summed <- Births_London_Data %>%
+  group_by(Date) %>% 
+  summarize(SUM_births = sum(annual_births)) %>%
+  data.frame()
+
+summary(Births_London_summed)
+
+```
+
+
+
+```{r fig_London_births1, fig.height = 5.56, fig.width = 9,  echo=FALSE, warning=FALSE, message=FALSE}
+
+
+Births_London_line <- Births_London_summed %>%
+  ggplot() +
+  geom_line(aes(x = Date, y = SUM_births, group = 1, 
+                text = paste("Area: London", 
+                             "<br>Year: ", Date,
+                             "<br>Births: ", round(SUM_births, digits = 0)) 
+  ), size = 1) + 
+  theme_gla() +
+      scale_x_date(limits = as.Date(c("2015-01-01", "2023-09-01"), 
+                                    date_breaks = "years",   date_labels = "%b %Y")) + 
+    ylim(100000, 140000) +
+  theme(axis.text.x=element_text(color = "black", 
+                                 size=11, family = "Arial"),  #, angle=30, vjust=.8, hjust=0.8
+        axis.text.y=element_text(color = "black", size=11, family = "Arial")) +
+  theme(legend.title=element_text(size=14, family = "Arial"),
+        legend.text=element_text(size=11, family = "Arial"),
+        axis.text.x=element_text(color = "black", 
+                                 size=11, family = "Arial"),  #, angle=30, vjust=.8, hjust=0.8
+        axis.text.y=element_text(color = "black", size=11, family = "Arial")) +
+  labs(title= "Births in London, 2015 - 2023, from GLA data", 
+     caption = paste0("Source: ONS, Chart: GLA demography"))
+
+ # ggsave (filename = (paste0(chart_dir, "Births_London_line.png")),
+ #          plot = Births_London_line,
+ #         device = "png",
+ #         dpi=600,
+ #         width = 9,
+ #         height = 5.56,
+ #         units = "in")
+
+Births_London_line_int <- ggplotly(Births_London_line, tooltip = "text") %>%
+   style(hoverlabel = list(bgcolor = "white")) %>%
+   layout(title= list(x = 0.05,
+                      text = "<b>Births in London, 2015 - 2023, from GLA data<b>",
+                      font=list(size = 20, family = "Arial", color = "black", fontface = "bold")),
+           legend=list(title=list(text='Area', font = list(size = 15, family = "Arial", color = "black", fontface = "bold"))),
+           xaxis = list(title = list(text ='',
+                                    font = list(size = 15, family = "Arial", color = "black",
+                                                fontface = "bold"))),
+           yaxis = list(title = list(text ='',
+                                    font = list(size = 15, family = "Arial", color = "black",
+                                                fontface = "bold")))
+                  )
+Births_London_line_int
+
+
+```
+
+
+
+```{r fig_London_births2, fig.height = 5.56, fig.width = 9,  echo=FALSE, warning=FALSE, message=FALSE}
+
+
+# Read in data for all births from 1993 to 2021 in England
+
+London_births <- readRDS("C:/Families/Data/Births_by_SYA_1993-2021/births_calendar_year_age_mother_lad.rds") %>%  
+  filter(grepl('E09', gss_code)) %>%
+  filter(age_mother =="total") %>%
+  mutate(Year = as.character(year)) %>%
+  group_by(Year) %>% 
+  summarize(SUM_births = sum(value)) %>%
+  data.frame()
+
+Births_London_line <- London_births %>%
+  ggplot() +
+  geom_line(aes(x = Year, y = SUM_births, group = 1, 
+                text = paste("Area: London", 
+                             "<br>Year: ", Year,
+                             "<br>Births: ", round(SUM_births, digits = 0)) 
+  ), size = 1) + 
+  theme_gla() +
+    scale_x_discrete(name ="Year", breaks=c("1991", "1996", "2001","2006","2011", "2016", "2021")) +
+    ylim(100000, 140000) +
+  theme(axis.text.x=element_text(color = "black", 
+                                 size=11, family = "Arial"),  #, angle=30, vjust=.8, hjust=0.8
+        axis.text.y=element_text(color = "black", size=11, family = "Arial")) +
+  theme(legend.title=element_text(size=14, family = "Arial"),
+        legend.text=element_text(size=11, family = "Arial"),
+        axis.text.x=element_text(color = "black", 
+                                 size=11, family = "Arial"),  #, angle=30, vjust=.8, hjust=0.8
+        axis.text.y=element_text(color = "black", size=11, family = "Arial")) +
+  labs(title= "Births in London, 1991 - 2021", 
+     caption = paste0("Source: ONS, Chart: GLA demography"))
+
+ # ggsave (filename = (paste0(chart_dir, "Births_London_line.png")),
+ #          plot = Births_London_line,
+ #         device = "png",
+ #         dpi=600,
+ #         width = 9,
+ #         height = 5.56,
+ #         units = "in")
+
+Births_London_line_int <- ggplotly(Births_London_line, tooltip = "text") %>%
+   style(hoverlabel = list(bgcolor = "white")) %>%
+   layout(title= list(x = 0.05,
+                      text = "<b>Births in London, 1991 - 2021, from ONS data<b>",
+                      font=list(size = 20, family = "Arial", color = "black", fontface = "bold")),
+           legend=list(title=list(text='Area', font = list(size = 15, family = "Arial", color = "black", fontface = "bold"))),
+           xaxis = list(title = list(text ='',
+                                    font = list(size = 15, family = "Arial", color = "black",
+                                                fontface = "bold"))),
+           yaxis = list(title = list(text ='',
+                                    font = list(size = 15, family = "Arial", color = "black",
+                                                fontface = "bold")))
+                  )
+Births_London_line_int
+
+
+```
+
+
+
+```{r fig_London_births3, fig.height = 5.56, fig.width = 9,  echo=FALSE, warning=FALSE, message=FALSE}
+
+
+## Line plot of births in London with confidence intervals
+
+
+Births_regions_abs_line <- Births_Regions_Data %>%
+  filter(gss_name == "London") %>%
+  ggplot() +
+  geom_line(aes(x = Date, y = annual_births, group = 1, 
+                text = paste("Date: ", date,
+                            "<br>Births: ", round(annual_births, digits = 0)) 
+  ), colour = "red") +
+  geom_line(aes(x = Date, y = interval_lower, group = 1, 
+                text = paste("Date: ", date,
+                             "<br>Lower interval: ", round(interval_lower, digits = 0)) 
+  ),colour = "blue", linetype = "dotted") +
+  geom_line(aes(x = Date, y = interval_upper, group = 1, 
+                text = paste("Date: ", date,
+                             "<br>Upper interval: ", round(interval_upper, digits = 0)) 
+  ), colour = "blue", linetype = "dotted") +
+  theme_gla() +
+      scale_x_date(limits = as.Date(c("2015-01-01", "2023-09-01"), 
+                                    date_breaks = "years",   date_labels = "%b %Y")) + 
+   #  scale_color_manual(name='Region:', values = colour_palette) +
+    theme(legend.title=element_text(size=14, family = "Arial"),
+        legend.text=element_text(size=11, family = "Arial"),
+        axis.text.x=element_text(color = "black", 
+                                 size=11, family = "Arial", angle = 45), # vjust=.8, hjust=0.8
+        axis.text.y=element_text(color = "black", size=11, family = "Arial")) +
+  labs(title= "Births in London, 2015 - 2023", 
+       caption = paste0("Source: GLA, Chart: GLA demography"))
+ 
+
+Births_regions_abs_line_int <- ggplotly(Births_regions_abs_line, tooltip = "text") %>%
+  style(hoverlabel = list(bgcolor = "white")) %>%
+  layout(legend=list(title=list(text='Region',
+                                font = list(family = "Arial", size = 16)),
+                     font = list(family = "Arial", size = 14))) %>%
+  layout(title= list(x = 0.05,
+                     text = "<b>Births in London, 2015 - 2023<b>",
+                     font=list(size = 20, family = "Arial")))
+Births_regions_abs_line_int
+
+```
+
+
+
+```{r fig_London_births4, fig.height = 5.56, fig.width = 9,  echo=FALSE, warning=FALSE, message=FALSE}
+
+# Now try to combine plots
+
+# Read in data for all births from 1993 to 2021 in England, and convert years to dates
+
+London_births_date <- readRDS("C:/Families/Data/Births_by_SYA_1993-2021/births_calendar_year_age_mother_lad.rds") %>%   filter(grepl('E09', gss_code)) %>%
+  filter(age_mother =="total") %>%
+  mutate(Date = as.Date(paste0("31/12/",year), format = "%d/%m/%Y")) %>%
+  group_by(year, Date) %>% 
+  summarize(SUM_births = sum(value)) %>%
+  filter(Date < "2015-12-31") %>%
+  data.frame()
+
+## Line plot of births in London with confidence intervals
+
+Births_London_abs_line <- Births_Regions_Data %>%
+  filter(gss_name == "London") %>%
+  filter(type != "interpolated") %>%
+  ggplot() +
+  geom_line(aes(x = Date, y = annual_births/1000, group = 1, 
+                text = paste("Date: ", date,
+                            "<br>Births: ", round(annual_births, digits = 0)) 
+  ), colour = "black", size = 0.7) +
+  geom_line(aes(x = Date, y = interval_lower/1000, group = 1, 
+                text = paste("Date: ", date,
+                             "<br>Lower interval: ", round(interval_lower, digits = 0)) 
+  ),colour = "red", linetype = "dotted", size = 0.7) +
+  geom_line(aes(x = Date, y = interval_upper/1000, group = 1, 
+                text = paste("Date: ", date,
+                             "<br>Upper interval: ", round(interval_upper, digits = 0)) 
+  ), colour = "red", linetype = "dotted", size = 0.7) +
+    geom_line(data = London_births_date, aes(x = Date, y = SUM_births/1000, group = 1, 
+                text = paste("Date: ", Date,
+                            "<br>Births: ", round(SUM_births, digits = 0)) 
+  ), colour = "black", size = 0.7) +
+  theme_gla() +
+  ylim(100, 140) +
+    scale_x_date(date_breaks = "5 years", date_labels = "%Y") +
+    theme(legend.title=element_text(size=14, family = "Arial"),
+        legend.text=element_text(size=11, family = "Arial"),
+        axis.text.x=element_text(color = "black", 
+                                 size=11, family = "Arial", angle = 45), # vjust=.8, hjust=0.8
+        axis.text.y=element_text(color = "black", size=11, family = "Arial")) +
+  labs(title= "Births in London (thousands), 1993 - 2023", 
+       caption = paste0("Source: ONS and GLA, Chart: GLA demography"))
+#Births_London_abs_line
+
+ggsave (filename = (paste0(chart_dir, "Births_London_abs_line.png")),
+         plot = Births_London_abs_line,
+         device = "png",
+         dpi=600,
+         width = 9,
+         height = 5.56,
+         units = "in")
+ 
+Births_London_abs_line_int <- ggplotly(Births_London_abs_line, tooltip = "text") %>%
+  style(hoverlabel = list(bgcolor = "white")) %>%
+  layout(legend=list(title=list(text='Region',
+                                font = list(family = "Arial", size = 16)),
+                     font = list(family = "Arial", size = 14))) %>%
+  layout(title= list(x = 0.05,
+                     text = "<b>Births in London (thousands), 1993 - 2023<b>",
+                     font=list(size = 20, family = "Arial")))
+Births_London_abs_line_int
+
+```
+
+
+```{r setup_4, include=FALSE}
+#--------------------------------------------------------------------------------
+
+# DATA FROM https://data.cccnewyork.org/data/table/48/live-births#48/85/40/a/a
+
+Births_NYC_Data <- read.csv("C:/Families/Births/NewYork_births.csv")  %>%
+#  mutate(date = as.Date(paste("01/01",year), format = "%d/%m/%Y")) %>%
+  mutate(date = as.Date(paste("01/01/",year),"%d/%m/%Y")) %>%
+  data.frame()
+  
+glimpse(Births_NYC_Data)
+
+```
+
+
+
+```{r fig_NYC_births1, fig.height = 5.56, fig.width = 9,  echo=FALSE, warning=FALSE, message=FALSE}
+
+
+Births_NYC_abs_line <- Births_NYC_Data %>%
+  filter(area == "city") %>%
+  ggplot() +
+  geom_line(aes(x = date, y = births/1000, group = 1, 
+                text = paste("Area: New York City", 
+                             "<br>Year: ", year,
+                             "<br>Births: ", format(round(births, 2), big.mark=",", scientific=FALSE))
+  ), size = 0.7) + 
+  theme_gla() +
+  scale_x_date(date_breaks = "5 years", date_labels = "%Y") +
+  ylim(100, 140) +
+  theme(axis.text.x=element_text(color = "black", 
+                                 size=11, family = "Arial"),  #, angle=30, vjust=.8, hjust=0.8
+        axis.text.y=element_text(color = "black", size=11, family = "Arial")) +
+  theme(legend.title=element_text(size=14, family = "Arial"),
+        legend.text=element_text(size=11, family = "Arial"),
+        axis.text.x=element_text(color = "black", 
+                                 size=11, family = "Arial"),  #, angle=30, vjust=.8, hjust=0.8
+        axis.text.y=element_text(color = "black", size=11, family = "Arial")) +
+  labs(title= "Births in New York City (thousands), 1995 - 2020", 
+     caption = paste0("Source: Citizens Committee for Children (New York), Chart: GLA demography")) 
+# Births_NYC_abs_line
+
+ggsave (filename = (paste0(chart_dir, "Births_NYC_abs_line.png")),
+         plot = Births_NYC_abs_line,
+         device = "png",
+         dpi=600,
+         width = 9,
+         height = 5.56,
+         units = "in")
+
+Births_NYC_abs_line_int <- ggplotly(Births_NYC_abs_line, tooltip = "text") %>%
+   style(hoverlabel = list(bgcolor = "white")) %>%
+   layout(title= list(x = 0.05,
+                      text = "<b>Births in New York City (thousands), 1995 - 2020<b>",
+                      font=list(size = 20, family = "Arial", color = "black", fontface = "bold")),
+           legend=list(title=list(text='Area', font = list(size = 15, family = "Arial", color = "black", fontface = "bold"))),
+           xaxis = list(title = list(text ='',
+                                    font = list(size = 15, family = "Arial", color = "black",
+                                                fontface = "bold"))),
+           yaxis = list(title = list(text ='',
+                                    font = list(size = 15, family = "Arial", color = "black",
+                                                fontface = "bold")))
+                  )
+Births_NYC_abs_line_int
+
+
+```
+
+
+
+
+
+
